@@ -1,7 +1,7 @@
 
 <#
 .SYNOPSIS
-In a hybrid Excahnge environment this process is intended to ensure
+In a hybrid Exchange environment this process is intended to ensure
 that Active Directory accounts for current staff are visible in the Office 365 Global Address Book.
 .DESCRIPTION
 Clears the 'msExchHideFromAddressLists' attribute for active staff accounts.
@@ -31,11 +31,7 @@ param (
 )
 
 function Get-ADData {
-   Write-Host ('{0},{1}' -f $MyInvocation.MyCommand.Name, $DomainController) -Fore Green
-   $cmdlets = 'Get-ADUser', 'Set-ADUser'
-   $dc = Select-DomainController $DomainController
-   New-ADsession -DC $dc -cmdlets $cmdlets -Cred $ADCredential
-
+   Write-Host ('{0}' -f $MyInvocation.MyCommand.Name) -Fore Green
    $aDparams = @{
       Filter     = "employeeId -like `'*`' -and mail -like `'*@*`' -and Enabled -eq `'True`'-and msExchHideFromAddressLists -like `'*`'"
       SearchBase = $StaffOrgUnit
@@ -61,15 +57,15 @@ filter Select-Accounts {
 }
 
 # ========================== Main ===============================
-. .\lib\Clear-SessionData.ps1
-. .\lib\New-ADSession.ps1
-. .\lib\Select-DomainController.ps1
-. .\lib\Show-TestRun.ps1
+Import-Module -Name 'CommonScriptFunctions'
 
-Show-TestRun
-Clear-SessionData
+Show-BlockInfo Start
+if ($WhatIf) { Show-TestRun }
+
+Connect-ADSession -DomainControllers $DomainController -Credential $ADCredential -Cmdlets 'Get-ADUser', 'Set-ADUser'
 
 Get-ADData | Select-Accounts | Clear-msExchHideFromAddressLists
 
 Clear-SessionData
-Show-TestRun
+if ($WhatIf) { Show-TestRun }
+Show-BlockInfo End
