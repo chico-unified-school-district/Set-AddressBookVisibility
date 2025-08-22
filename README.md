@@ -1,4 +1,6 @@
 # Set-AddressBookVisibility
-Unhide users from the Office 365 Global Address Book via the 'msExchHideFromAddressLists' attribute.
+
+In a hybrid Exchange environment this process is intended to ensure
+that Active Directory accounts are properly displayed in the Office 365 Global Address Book.
 
 Changes can take up to 24 hours to sync.
