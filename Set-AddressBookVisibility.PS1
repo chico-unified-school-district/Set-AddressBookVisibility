@@ -17,43 +17,62 @@ Clears the 'msExchHideFromAddressLists' attribute for active staff accounts.
 
 [cmdletbinding()]
 param (
-   [Parameter(Mandatory = $True)]
-   [Alias('DC')]
-   [string[]]$DomainController,
-   # PSSession to Domain Controller and Use Active Directory CMDLETS
-   [Parameter(Mandatory = $True)]
-   [System.Management.Automation.PSCredential]$ADCredential,
-   [Parameter(Mandatory = $True)]
-   [Alias('OU')]
-   [string]$StaffOrgUnit,
-   [Alias('wi')]
-   [SWITCH]$WhatIf
+ [Parameter(Mandatory = $True)]
+ [Alias('DC')]
+ [string[]]$DomainControllers,
+ # PSSession to Domain Controller and Use Active Directory CMDLETS
+ [Parameter(Mandatory = $True)]
+ [System.Management.Automation.PSCredential]$ADCredential,
+ [Parameter(Mandatory = $True)]
+ [string]$StaffOrgUnit,
+ [string]$StudentOrgUnit,
+ [Alias('wi')]
+ [SWITCH]$WhatIf
 )
 
-function Get-ADData {
-   Write-Host ('{0}' -f $MyInvocation.MyCommand.Name) -Fore Green
-   $aDparams = @{
-      Filter     = "employeeId -like `'*`' -and mail -like `'*@*`' -and Enabled -eq `'True`'-and msExchHideFromAddressLists -like `'*`'"
-      SearchBase = $StaffOrgUnit
-      Properties = 'msExchHideFromAddressLists', 'employeeId', 'mail', 'title', 'AccountExpirationDate'
-   }
-   Get-ADUser @aDparams
+function Get-StaffADData {
+ Write-Host ('{0}' -f $MyInvocation.MyCommand.Name) -Fore Green
+ $aDparams = @{
+  Filter     = "employeeId -like `'*`' -and mail -like `'*@*`' -and Enabled -eq `'True`'-and msExchHideFromAddressLists -like `'*`'"
+  SearchBase = $StaffOrgUnit
+  Properties = 'msExchHideFromAddressLists', 'EmployeeId', 'Mail', 'Title', 'AccountExpirationDate'
+ }
+ Get-ADUser @aDparams
+}
+
+function Get-StudentADData {
+ Write-Host ('{0}' -f $MyInvocation.MyCommand.Name) -Fore Green
+ $aDparams = @{
+  Filter     = "employeeId -like '*' -and Enabled -eq 'True'"
+  SearchBase = $StudentOrgUnit
+  Properties = 'msExchHideFromAddressLists', 'EmployeeId', 'Title'
+ }
+ Get-ADUser @aDparams
 }
 
 function Clear-msExchHideFromAddressLists {
-   process {
-      Write-Verbose ($_ | Out-String)
-      $msgData = $MyInvocation.MyCommand.Name, $_.employeeId, $_.samAccountName, $_.msExchHideFromAddressLists
-      Write-Host ('{0},{1},{2},Old Value: [{3}]' -f $msgData ) -Fore Yellow
-      Set-ADUser -Identity $_.ObjectGUID -Clear msExchHideFromAddressLists -Confirm:$false -WhatIf:$WhatIf
-   }
+ process {
+  Write-Verbose ($_ | Out-String)
+  $msgData = $MyInvocation.MyCommand.Name, $_.employeeId, $_.samAccountName, $_.msExchHideFromAddressLists
+  Write-Host ('{0},{1},{2},Old Value: [{3}]' -f $msgData ) -Fore Yellow
+  Set-ADUser -Identity $_.ObjectGUID -Clear msExchHideFromAddressLists -Confirm:$false -WhatIf:$WhatIf
+ }
 }
 
 filter Select-Accounts {
-   $_ | Where-Object {
+ $_ | Where-Object {
   ($_.employeeID -match "\d{4,}") -and
   (($_.title -notlike "*generic*") -or ($_.title -notlike "*service*"))
-   }
+ }
+}
+
+function Set-msExchHideFromAddressLists {
+ process {
+  Write-Verbose ($_ | Out-String)
+  $msgData = $MyInvocation.MyCommand.Name, $_.employeeId, $_.samAccountName, $_.msExchHideFromAddressLists
+  Write-Host ('{0},{1},{2},Old Value: [{3}]' -f $msgData ) -Fore Yellow
+  Set-ADUser -Identity $_.ObjectGUID -Replace @{msExchHideFromAddressLists = $True } -Confirm:$false -WhatIf:$WhatIf
+ }
 }
 
 # ========================== Main ===============================
@@ -62,9 +81,11 @@ Import-Module -Name 'CommonScriptFunctions'
 Show-BlockInfo Start
 if ($WhatIf) { Show-TestRun }
 
-Connect-ADSession -DomainControllers $DomainController -Credential $ADCredential -Cmdlets 'Get-ADUser', 'Set-ADUser'
+Connect-ADSession -DomainControllers $DomainControllers -Credential $ADCredential -Cmdlets 'Get-ADUser', 'Set-ADUser'
 
-Get-ADData | Select-Accounts | Clear-msExchHideFromAddressLists
+Get-StaffADData | Select-Accounts | Clear-msExchHideFromAddressLists
+
+Get-StudentADData |  Select-Accounts | Set-msExchHideFromAddressLists
 
 Clear-SessionData
 if ($WhatIf) { Show-TestRun }
